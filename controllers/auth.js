@@ -1,9 +1,10 @@
 import User from "../models/User.js";
+import asyncHandler from '../middleware/async.js';
 
 // @desc    Register user
 // @route   POST /api/v1/auth/register
 // @access  Public
-const register = async (req, res) => {
+const register = asyncHandler(async (req, res) => {
 	try {
 		const { name, email, password, role, telephone } = req.body;
 
@@ -25,12 +26,12 @@ const register = async (req, res) => {
 		res.status(400).json({ success: false });
 		console.log(err.stack);
 	}
-};
+});
 
 // @desc    Login user
 // @route   POST /api/v1/auth/login
 // @access  Public
-const login = async (req, res) => {
+const login = asyncHandler(async (req, res) => {
 	const { email, password } = req.body;
 
 	// Validate email & password
@@ -57,10 +58,10 @@ const login = async (req, res) => {
 	// const token = user.getSignedJwtToken();
 	// res.status(200).json({success: true, token});
 	sendTokenResponse(user, 200, res);
-};
+});
 
 // Get token from model, create cookie and send response
-const sendTokenResponse = (user, statusCode, res) => {
+const sendTokenResponse = asyncHandler((user, statusCode, res) => {
 	// Create token
 	const token = user.getSignedJwtToken();
 
@@ -77,18 +78,27 @@ const sendTokenResponse = (user, statusCode, res) => {
 		success: true,
 		token,
 	});
-};
+});
 
 //At the end of file
 //@desc     Get current logged in user
 //@route    GET /api/v1/auth/me
 //@access   Private
-const getMe = async (req, res) => {
+const getMe = asyncHandler(async (req, res) => {
 	const user = await User.findById(req.user.id);
 	res.status(200).json({
 		success: true,
 		data: user,
 	});
-};
+});
 
-export { register, login, getMe };
+// @desc    Logout user (basic - client-side token removal)
+// @route   GET /api/v1/auth/logout
+// @access  Private (optional, depends on your implementation)
+const logout = asyncHandler(async (req, res, next) => {
+	// On the server-side, you might want to invalidate the token (more complex)
+	// For a simple API, the client usually just removes the token.
+	res.status(200).json({ success: true, msg: 'Logged out' });
+  });
+
+export { register, login, getMe , logout };

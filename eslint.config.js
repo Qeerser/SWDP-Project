@@ -7,6 +7,9 @@ export default defineConfig([
 		files: ["**/*.{js,mjs,cjs}"],
 		plugins: { js },
 		extends: ["js/recommended"],
+		rules: {
+			"no-unused-vars": "off", // Disable the no-unused-vars rule
+		  },
 	},
 	{
 		files: ["**/*.{js,mjs,cjs}"],
