@@ -3,7 +3,10 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import connectDB from "./config/db.js";
 import os from "os";
-import auth from "./routes/auth.js";
+import authRoutes from './routes/auth.js';
+import coworkingSpaceRoutes from './routes/coWorkingSpace.js';
+import roomRoutes from './routes/room.js';
+import reservationRoutes from './routes/reservation.js';
 
 dotenv.config({ path: "./config/config.env" });
 
@@ -16,12 +19,16 @@ async function startServer() {
 		app.use(express.json());
 		app.use(cookieParser());
 
-		const router = express.Router();
-		router.get("/", (req, res) => {
+		app.get("/", (req, res) => {
 			res.send("API is running...");
 		});
-		router.use("/auth", auth);
+		const router = express.Router();
 		app.use("/api/v1", router);
+
+		router.use('/auth', authRoutes);
+		router.use('/coworking-spaces', coworkingSpaceRoutes);
+		router.use('/rooms', roomRoutes); // You might not need a separate /api/v1/rooms if accessed via coworking space
+		router.use('/reservations', reservationRoutes);
 
 		const port = process.env.PORT || 5000;
 
