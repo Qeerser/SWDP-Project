@@ -1,8 +1,8 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-
+import asyncHandler from './async.js';
 // Protect routes
-const protect = async (req, res, next) => {
+const protect = asyncHandler(async (req, res, next) => {
 	let token;
 
 	if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
@@ -27,7 +27,7 @@ const protect = async (req, res, next) => {
 		console.log(err.stack);
 		return res.status(401).json({ success: false, message: "Not authorized to access this route" });
 	}
-};
+});
 
 //at the end of file
 //Grant access to specific roles
