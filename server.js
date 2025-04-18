@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.js";
 import coworkingSpaceRoutes from "./routes/coWorkingSpace.js";
 import roomRoutes from "./routes/room.js";
 import reservationRoutes from "./routes/reservation.js";
+import { startAgenda } from "./utils/agenda.js";
 
 dotenv.config({ path: "./config/config.env" });
 
@@ -27,7 +28,7 @@ async function startServer() {
 
     router.use("/auth", authRoutes);
     router.use("/coworking-spaces", coworkingSpaceRoutes);
-    router.use("/rooms", roomRoutes); // You might not need a separate /api/v1/rooms if accessed via coworking space
+    router.use("/rooms", roomRoutes);
     router.use("/reservations", reservationRoutes);
 
     const port = process.env.PORT || 5000;
@@ -37,6 +38,9 @@ async function startServer() {
       console.log(`  Local:   http://localhost:${port}`);
       console.log(`  NodeJS Version: ${process.version}`);
       console.log(`  OS: ${os.type()} ${os.release()}`);
+
+      // Start Agenda after server is running
+      startAgenda();
     });
 
     process.on("unhandledRejection", (err) => {
