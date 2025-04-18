@@ -1,4 +1,6 @@
 import Agenda from "agenda";
+import dotenv from "dotenv";
+dotenv.config({ path: "./config/config.env" });
 
 const agenda = new Agenda({
   db: {
