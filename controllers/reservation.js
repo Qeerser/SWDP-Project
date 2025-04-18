@@ -3,14 +3,16 @@ import asyncHandler from "../middleware/async.js";
 import CoWorkingSpace from "../models/CoWorkingSpace.js";
 import Room from "../models/Room.js";
 import User from "../models/User.js";
+import { agenda } from "../utils/agenda.js";
+import { sendEmail } from "../utils/emailConfig.js";
 
 // @desc    Get all reservations (Admin only)
 // @route   GET /api/v1/reservations
 // @access  Private (Admin)
 export const getReservations = asyncHandler(async (req, res, next) => {
   const reservations = await Reservation.find()
-    .populate("coWorkingSpace")
-    .populate("sharedWith"); // Add this to populate shared users
+    .populate("user coWorkingSpace room")
+    .populate("sharedWith");
 
   res
     .status(200)
@@ -22,8 +24,8 @@ export const getReservations = asyncHandler(async (req, res, next) => {
 // @access  Private (User/Admin - can check ownership)
 export const getReservation = asyncHandler(async (req, res, next) => {
   const reservation = await Reservation.findById(req.params.id)
-    .populate("coWorkingSpace")
-    .populate("sharedWith"); // Add this to populate shared users
+    .populate("user coWorkingSpace room")
+    .populate("sharedWith");
 
   if (!reservation) {
     return res.status(404).json({
@@ -59,11 +61,11 @@ export const getUserReservations = asyncHandler(async (req, res, next) => {
   // Get both owned reservations and shared reservations
   const ownedReservations = await Reservation.find({
     user: req.user.id,
-  }).populate("coWorkingSpace");
+  }).populate("coWorkingSpace room");
 
   const sharedReservations = await Reservation.find({
     sharedWith: req.user.id,
-  }).populate("coWorkingSpace");
+  }).populate("coWorkingSpace room");
 
   // Combine the results
   const reservations = [...ownedReservations, ...sharedReservations];
@@ -127,7 +129,7 @@ export const createReservation = asyncHandler(async (req, res, next) => {
 
   const reservation = await Reservation.create(req.body);
 
-  // Schedule a reminder for this reservation
+  // Schedule a reminder for this reservation using Agenda
   scheduleReservationReminder(reservation._id);
 
   res.status(201).json({ success: true, data: reservation });
@@ -157,10 +159,28 @@ export const updateReservation = asyncHandler(async (req, res, next) => {
     });
   }
 
+  // If the start time is being updated, reschedule the reminder
+  const startTimeChanged =
+    req.body.startTime &&
+    new Date(req.body.startTime).getTime() !==
+      new Date(reservation.startTime).getTime();
+
   reservation = await Reservation.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true,
-  }).populate("coWorkingSpace");
+  }).populate("coWorkingSpace room");
+
+  // If start time changed, cancel old reminder and schedule new one
+  if (startTimeChanged) {
+    // Cancel existing reminder job
+    await agenda.cancel({
+      name: "send reservation reminder",
+      "data.reservationId": reservation._id.toString(),
+    });
+
+    // Schedule new reminder
+    scheduleReservationReminder(reservation._id);
+  }
 
   res.status(200).json({ success: true, data: reservation });
 });
@@ -189,13 +209,19 @@ export const deleteReservation = asyncHandler(async (req, res, next) => {
     });
   }
 
+  // Cancel any scheduled reminder
+  await agenda.cancel({
+    name: "send reservation reminder",
+    "data.reservationId": reservation._id.toString(),
+  });
+
   await reservation.deleteOne();
 
   res.status(200).json({ success: true, data: {} });
 });
 
-// FEATURE 1: Automatic Reservation Reminders
-// @desc    Schedule a reminder for a reservation
+// FEATURE 1: Automatic Reservation Reminders with Agenda and Nodemailer
+// @desc    Schedule a reminder for a reservation using Agenda
 // @param   reservationId - The ID of the reservation to schedule a reminder for
 const scheduleReservationReminder = async (reservationId) => {
   try {
@@ -208,60 +234,94 @@ const scheduleReservationReminder = async (reservationId) => {
       return;
     }
 
-    // Calculate time until 1 hour before reservation
+    // Calculate time for 1 hour before reservation
     const reminderTime = new Date(reservation.startTime);
     reminderTime.setHours(reminderTime.getHours() - 1);
 
-    const now = new Date();
-    const timeUntilReminder = reminderTime.getTime() - now.getTime();
+    // Schedule the reminder job with Agenda
+    await agenda.schedule(reminderTime, "send reservation reminder", {
+      reservationId: reservation._id.toString(),
+    });
 
-    if (timeUntilReminder <= 0) {
-      // If the reminder time has already passed, send immediately
-      sendReservationReminder(reservation);
-    } else {
-      // Schedule the reminder
-      setTimeout(() => {
-        sendReservationReminder(reservation);
-      }, timeUntilReminder);
-
-      console.log(
-        `Reminder scheduled for reservation ${reservationId} in ${
-          timeUntilReminder / 1000 / 60
-        } minutes`
-      );
-    }
+    console.log(
+      `Reminder scheduled for reservation ${reservationId} at ${reminderTime}`
+    );
   } catch (err) {
     console.error("Error scheduling reminder:", err);
   }
 };
 
-// @desc    Send a reminder for a reservation
-// @param   reservation - The reservation object to send a reminder for
-const sendReservationReminder = async (reservation) => {
+// @desc    Send a reminder email for a reservation
+// @param   reservationId - The ID of the reservation to send a reminder for
+export const sendReservationReminderEmail = async (reservationId) => {
   try {
-    // In a real application, you would send an email or notification here
-    console.log(
-      `REMINDER: Sending reminder to ${reservation.user.email} for reservation in ${reservation.room.name} at ${reservation.startTime}`
-    );
+    const reservation = await Reservation.findById(reservationId)
+      .populate("user", "email name")
+      .populate("room", "name capacity")
+      .populate("coWorkingSpace", "name address")
+      .populate("sharedWith", "email name");
 
-    // Mark reminder as sent
-    await Reservation.findByIdAndUpdate(reservation._id, {
-      reminderSent: true,
+    if (!reservation) {
+      console.error(
+        `Reservation ${reservationId} not found for sending reminder`
+      );
+      return;
+    }
+
+    // Format dates for display
+    const startTime = new Date(reservation.startTime).toLocaleString();
+    const endTime = new Date(reservation.endTime).toLocaleString();
+
+    // Send email to the reservation owner
+    await sendEmail({
+      email: reservation.user.email,
+      subject: "Reminder: Your Upcoming Reservation",
+      html: `
+        <h1>Reservation Reminder</h1>
+        <p>Hello ${reservation.user.name},</p>
+        <p>This is a reminder about your upcoming reservation:</p>
+        <ul>
+          <li><strong>Location:</strong> ${reservation.coWorkingSpace.name}</li>
+          <li><strong>Room:</strong> ${reservation.room.name}</li>
+          <li><strong>Start Time:</strong> ${startTime}</li>
+          <li><strong>End Time:</strong> ${endTime}</li>
+        </ul>
+        <p>Please arrive on time. If you need to cancel or modify your reservation, please do so at least 2 hours in advance.</p>
+        <p>Thank you for using our service!</p>
+      `,
     });
 
     // Also send reminders to shared users
     if (reservation.sharedWith && reservation.sharedWith.length > 0) {
-      for (const userId of reservation.sharedWith) {
-        const sharedUser = await User.findById(userId);
-        if (sharedUser) {
-          console.log(
-            `REMINDER: Sending reminder to shared user ${sharedUser.email} for reservation in ${reservation.room.name} at ${reservation.startTime}`
-          );
-        }
+      for (const sharedUser of reservation.sharedWith) {
+        await sendEmail({
+          email: sharedUser.email,
+          subject: "Reminder: Shared Reservation",
+          html: `
+            <h1>Shared Reservation Reminder</h1>
+            <p>Hello ${sharedUser.name},</p>
+            <p>${reservation.user.name} has shared a reservation with you:</p>
+            <ul>
+              <li><strong>Location:</strong> ${reservation.coWorkingSpace.name}</li>
+              <li><strong>Room:</strong> ${reservation.room.name}</li>
+              <li><strong>Start Time:</strong> ${startTime}</li>
+              <li><strong>End Time:</strong> ${endTime}</li>
+            </ul>
+            <p>Please arrive on time.</p>
+            <p>Thank you for using our service!</p>
+          `,
+        });
       }
     }
+
+    // Mark reminder as sent
+    await Reservation.findByIdAndUpdate(reservationId, {
+      reminderSent: true,
+    });
+
+    console.log(`Reminder emails sent for reservation ${reservationId}`);
   } catch (err) {
-    console.error("Error sending reminder:", err);
+    console.error("Error sending reminder emails:", err);
   }
 };
 
@@ -277,13 +337,16 @@ export const initializeReminders = asyncHandler(async (req, res, next) => {
     });
   }
 
+  // Cancel any existing reminder jobs to avoid duplicates
+  await agenda.cancel({ name: "send reservation reminder" });
+
   const futureReservations = await Reservation.find({
     startTime: { $gt: new Date() },
     reminderSent: false,
   });
 
   for (const reservation of futureReservations) {
-    scheduleReservationReminder(reservation._id);
+    await scheduleReservationReminder(reservation._id);
   }
 
   res.status(200).json({
@@ -336,6 +399,26 @@ export const shareReservation = asyncHandler(async (req, res, next) => {
   reservation.sharedWith.push(userIdToShareWith);
   await reservation.save();
 
+  // Send notification email to the user being shared with
+  const startTime = new Date(reservation.startTime).toLocaleString();
+  const endTime = new Date(reservation.endTime).toLocaleString();
+
+  await sendEmail({
+    email: userToShareWith.email,
+    subject: "Reservation Shared With You",
+    html: `
+      <h1>Reservation Shared</h1>
+      <p>Hello ${userToShareWith.name},</p>
+      <p>${req.user.name} has shared a reservation with you:</p>
+      <ul>
+        <li><strong>Start Time:</strong> ${startTime}</li>
+        <li><strong>End Time:</strong> ${endTime}</li>
+      </ul>
+      <p>You can view the full details in your account.</p>
+      <p>Thank you for using our service!</p>
+    `,
+  });
+
   res.status(200).json({
     success: true,
     msg: `Reservation shared with ${userToShareWith.name}`,
@@ -368,14 +451,31 @@ export const removeSharedUser = asyncHandler(async (req, res, next) => {
     });
   }
 
+  // Get user details before removing
+  const userToRemove = await User.findById(userId);
+
   // Remove user from sharedWith array
   reservation = await Reservation.findByIdAndUpdate(
     req.params.id,
     { $pull: { sharedWith: userId } },
     { new: true, runValidators: true }
   )
-    .populate("coWorkingSpace")
+    .populate("coWorkingSpace room")
     .populate("sharedWith");
+
+  // Notify the user that they've been removed
+  if (userToRemove) {
+    await sendEmail({
+      email: userToRemove.email,
+      subject: "Reservation Access Removed",
+      html: `
+        <h1>Reservation Access Update</h1>
+        <p>Hello ${userToRemove.name},</p>
+        <p>Your access to a shared reservation has been removed.</p>
+        <p>If you believe this is an error, please contact the reservation owner.</p>
+      `,
+    });
+  }
 
   res.status(200).json({
     success: true,
@@ -397,7 +497,10 @@ export const requestExtension = asyncHandler(async (req, res, next) => {
     });
   }
 
-  let reservation = await Reservation.findById(req.params.id);
+  let reservation = await Reservation.findById(req.params.id)
+    .populate("user", "email name")
+    .populate("room", "name");
+
   if (!reservation) {
     return res.status(404).json({
       success: false,
@@ -407,7 +510,7 @@ export const requestExtension = asyncHandler(async (req, res, next) => {
 
   // Make sure user is the reservation owner
   if (
-    reservation.user.toString() !== req.user.id &&
+    reservation.user._id.toString() !== req.user.id &&
     req.user.role !== "admin"
   ) {
     return res.status(401).json({
@@ -426,7 +529,7 @@ export const requestExtension = asyncHandler(async (req, res, next) => {
 
   // Check if the room is available for the extended time
   const conflictingReservation = await Reservation.findOne({
-    room: reservation.room,
+    room: reservation.room._id,
     startTime: { $lt: new Date(newEndTime) },
     endTime: { $gt: reservation.endTime },
     _id: { $ne: reservation._id },
@@ -450,7 +553,23 @@ export const requestExtension = asyncHandler(async (req, res, next) => {
         extensionApproved: true,
       },
       { new: true, runValidators: true }
-    ).populate("coWorkingSpace");
+    ).populate("coWorkingSpace room");
+
+    // Notify the user that their extension was approved
+    await sendEmail({
+      email: reservation.user.email,
+      subject: "Reservation Extension Approved",
+      html: `
+        <h1>Extension Approved</h1>
+        <p>Hello ${reservation.user.name},</p>
+        <p>Your request to extend your reservation in ${
+          reservation.room.name
+        } has been approved.</p>
+        <p>The reservation now ends at ${new Date(
+          newEndTime
+        ).toLocaleString()}.</p>
+      `,
+    });
   } else {
     reservation = await Reservation.findByIdAndUpdate(
       req.params.id,
@@ -459,7 +578,31 @@ export const requestExtension = asyncHandler(async (req, res, next) => {
         requestedEndTime: newEndTime,
       },
       { new: true, runValidators: true }
-    ).populate("coWorkingSpace");
+    ).populate("coWorkingSpace room");
+
+    // Notify admins about the extension request
+    const admins = await User.find({ role: "admin" });
+
+    for (const admin of admins) {
+      await sendEmail({
+        email: admin.email,
+        subject: "New Reservation Extension Request",
+        html: `
+          <h1>Extension Request</h1>
+          <p>Hello ${admin.name},</p>
+          <p>User ${
+            reservation.user.name
+          } has requested to extend their reservation in ${
+          reservation.room.name
+        }.</p>
+          <p>Current end time: ${new Date(
+            reservation.endTime
+          ).toLocaleString()}</p>
+          <p>Requested end time: ${new Date(newEndTime).toLocaleString()}</p>
+          <p>Please review this request in the admin dashboard.</p>
+        `,
+      });
+    }
   }
 
   res.status(200).json({
@@ -480,7 +623,10 @@ export const approveExtension = asyncHandler(async (req, res, next) => {
     });
   }
 
-  let reservation = await Reservation.findById(req.params.id);
+  let reservation = await Reservation.findById(req.params.id)
+    .populate("user", "email name")
+    .populate("room", "name");
+
   if (!reservation) {
     return res.status(404).json({
       success: false,
@@ -504,7 +650,23 @@ export const approveExtension = asyncHandler(async (req, res, next) => {
       $unset: { requestedEndTime: "" },
     },
     { new: true, runValidators: true }
-  ).populate("coWorkingSpace");
+  ).populate("coWorkingSpace room");
+
+  // Notify the user that their extension was approved
+  await sendEmail({
+    email: reservation.user.email,
+    subject: "Reservation Extension Approved",
+    html: `
+      <h1>Extension Approved</h1>
+      <p>Hello ${reservation.user.name},</p>
+      <p>Your request to extend your reservation in ${
+        reservation.room.name
+      } has been approved.</p>
+      <p>The reservation now ends at ${new Date(
+        reservation.endTime
+      ).toLocaleString()}.</p>
+    `,
+  });
 
   res.status(200).json({
     success: true,
