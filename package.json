@@ -1,0 +1,39 @@
+{
+	"name": "swdp-project",
+	"version": "1.0.0",
+	"description": "",
+	"homepage": "https://github.com/Qeerser/SWDP-Project#readme",
+	"bugs": {
+		"url": "https://github.com/Qeerser/SWDP-Project/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Qeerser/SWDP-Project.git"
+	},
+	"license": "ISC",
+	"author": "",
+	"type": "module",
+	"main": "server.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"dev": "nodemon server.js",
+		"lint": "eslint ."
+	},
+	"dependencies": {
+		"agenda": "^5.0.0",
+		"bcryptjs": "^3.0.2",
+		"cookie-parser": "^1.4.7",
+		"dotenv": "^16.5.0",
+		"express": "^5.1.0",
+		"jsonwebtoken": "^9.0.2",
+		"mongoose": "^8.13.2",
+		"nodemailer": "^6.10.1",
+		"punycode": "^2.3.1"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.24.0",
+		"eslint": "^9.24.0",
+		"globals": "^16.0.0",
+		"nodemon": "^3.1.9"
+	}
+}

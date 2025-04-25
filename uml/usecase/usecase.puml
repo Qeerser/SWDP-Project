@@ -1,0 +1,53 @@
+@startuml
+left to right direction
+actor User
+actor Admin
+
+rectangle "Co-working Space Reservation System" {
+    package "User Management" {
+    usecase "Register" as UC1
+    usecase "Login" as UC2
+    usecase "Logout" as UC3
+    }
+
+    package "Co-working Space & Reservation" {
+    usecase "View Co-working Space List" as UC4
+    usecase "Reserve Room" as UC5
+    usecase "View Reservation" as UC6
+    usecase "Edit Reservation" as UC7
+    usecase "Delete Reservation" as UC8
+    usecase "Send Reservation Reminders" as UC12
+    usecase "Share Reservation Details" as UC13
+    usecase "Extend Reservation" as UC14
+    }
+
+    package "Admin Functions" {
+    usecase "View All Reservations" as UC9
+    usecase "Edit Any Reservation" as UC10
+    usecase "Delete Any Reservation" as UC11
+    }
+}
+
+User -- UC1
+User -- UC2
+User -- UC3
+User -- UC4
+User -- UC5
+User -- UC6
+User -- UC7
+User -- UC8
+Admin -- UC9
+Admin -- UC10
+Admin -- UC11
+UC2 -- UC3
+UC2 -- UC4
+UC2 -- UC5
+UC2 -- UC6
+UC2 -- UC7
+UC2 -- UC8
+UC9 -- UC4
+UC12 -- UC5
+UC13 -- UC6
+UC14 -- UC7
+
+@enduml

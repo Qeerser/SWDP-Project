@@ -1,0 +1,20 @@
+@startuml
+title Share Reservation
+
+actor "User" as User
+participant "Controller" as ReservationController
+participant "ReservationService" as ReservationService
+participant "Reservation" as Reservation
+actor "User (Teammate)" as Teammate
+
+User ->> ReservationController : POST /reservations/:id/share { userId }
+ReservationController ->> ReservationService : shareReservation(reservationId, teammateId)
+ReservationService ->> Reservation : findById(reservationId)
+Reservation ->> ReservationService : returns reservation
+ReservationService ->> Teammate : findById(teammateId)
+Teammate ->> ReservationService : returns teammate
+ReservationService ->> Reservation : update sharedWith array (add teammateId)
+Reservation ->> ReservationService : acknowledgement
+ReservationService ->> ReservationController : returns updated reservation
+ReservationController ->> User : returns success
+@enduml

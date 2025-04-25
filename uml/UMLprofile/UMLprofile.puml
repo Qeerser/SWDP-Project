@@ -1,0 +1,214 @@
+@startuml
+title CoWorkingSpaceService Class Diagram
+left to right direction
+
+class "CoWorkingSpaceService" <<Application>>
+
+class "auth" <<Resource>>
+
+class "auth/login" <<Resource>> {
+    <<POST>> + /login(): User
+}
+
+class "auth/register" <<Resource>> {
+    <<POST>> + /register(): User
+}
+
+class "auth/me" <<Resource>> {
+    <<GET>> + /me(): User
+}
+
+class "auth/logout" <<Resource>> {
+    <<GET>> + /logout(): User
+}
+
+class "coWorkingSpace" <<Resource>>
+
+class "coWorkingSpace/" <<Resource>> {
+    <<GET>> + /(): CoWorkingSpace[]
+    <<POST>> + /(): CoWorkingSpace <<admin>>
+}
+
+class "coWorkingSpace/:id" <<Resource>> {
+    <<GET>> + /{id}(): CoWorkingSpace
+    <<PUT>> + /{id}(): CoWorkingSpace <<admin>>
+    <<DELETE>> + /{id}(): void <<admin>>
+}
+
+class "coWorkingSpace/:coworkingSpaceId/rooms" <<Resource>>
+
+class "coWorkingSpace/:coworkingSpaceId/rooms/" <<Resource>> {
+    <<GET>> + /(): Room[]
+    <<POST>> + /(): Room <<admin>>
+}
+
+class "coWorkingSpace/:coworkingSpaceId/rooms/:id" <<Resource>> {
+    <<GET>> + /{id}(): Room
+    <<PUT>> + /{id}(): Room <<admin>>
+    <<DELETE>> + /{id}(): void <<admin>>
+}
+
+class "reservation" <<Resource>>
+
+class "reservation/" <<Resource>> {
+    <<GET>> + /(): Reservation[] <<admin>>
+    <<POST>> + /(): Reservation
+}
+
+class "reservation/me" <<Resource>> {
+    <<GET>> + /me(): Reservation[]
+}
+
+class "reservation/:id" <<Resource>> {
+    <<GET>> + /{id}(): Reservation
+    <<PUT>> + /{id}(): Reservation
+    <<DELETE>> + /{id}(): void
+}
+
+package "Share" <<Rectangle>> #LightYellow{
+    class "reservation/:id/share" <<Resource>> {
+        <<POST>> + /{id}/share(): void
+    }
+
+    class "reservation/:id/share/:userId" <<Resource>> {
+        <<DELETE>> + /{id}/share/{userId}(): void
+    }
+}
+
+package "Extend" <<Rectangle>> #LightGreen{
+    class "reservation/:id/extend" <<Resource>> {
+        <<POST>> + /{id}/extend(): void
+    }
+
+    class "reservation/:id/approve-extension" <<Resource>> {
+        <<PUT>> + /{id}/approve-extension(): void <<admin>>
+    }
+}
+
+package "Notifications" <<Rectangle>> #LightBlue {
+    class "AgendaService" {
+        + scheduleNotification(Reservation)
+        - agenda: Agenda
+        - transporter: nodemailer.Transporter
+    }
+}
+
+class User <<Resource>> {
+    - _id: ObjectId
+    - name: string
+    - email: string <<unique>>
+    - role: string <<enum: user|admin>> = "user"
+    - password: string <<minlength: 6, select: false>>
+    - telephone: string <<unique>>
+    - resetPasswordToken: string
+    - resetPasswordExpire: Date
+    - createdAt: Date
+    + getSignedJwtToken(): string
+    + matchPassword(string): boolean
+}
+
+class Admin <<Resource>> {
+    + viewAllReservations()
+    + editAnyReservation()
+    + deleteAnyReservation()
+}
+
+class CoWorkingSpace <<Resource>> {
+    - _id: ObjectId
+    - name: string
+    - address: string
+    - telephoneNumber: string
+    - openTime: string
+    - closeTime: string
+    - rooms: ObjectId[] <<ref: Room>>
+    - createdAt: Date
+    - updatedAt: Date
+}
+
+class Room <<Resource>> {
+    - _id: ObjectId
+    - name: string
+    - capacity: Number
+    - amenities: string[]
+    - coWorkingSpace: ObjectId <<ref: CoWorkingSpace>>
+    - reservations: ObjectId[] <<ref: Reservation>>
+    - createdAt: Date
+    - updatedAt: Date
+}
+
+class Reservation <<Resource>> {
+    - _id: ObjectId
+    - user: ObjectId <<ref: User, required>>
+    - coWorkingSpace: ObjectId <<ref: CoWorkingSpace, required>>
+    - room: ObjectId <<ref: Room, required>>
+    - date: Date <<required>>
+    - startTime: Date <<required>>
+    - endTime: Date <<required>>
+    - sharedWith: ObjectId[] <<ref: User>>
+    - createdAt: Date
+    - updatedAt: Date
+    - reminderSent: Boolean = false
+    - extensionRequested: Boolean = false
+    + viewReservation()
+    + editReservation()
+    + deleteReservation()
+    + shareReservation()
+    + extendReservation()
+}
+
+"CoWorkingSpaceService" --> "auth" : uses
+"CoWorkingSpaceService" --> "coWorkingSpace" : uses
+"CoWorkingSpaceService" --> "reservation" : uses
+"CoWorkingSpaceService" --> "Notifications" : uses
+
+"auth" --> "auth/login" : /login <<path>>
+"auth" --> "auth/register" : /register <<path>>
+"auth" --> "auth/me" : /me <<path>>
+"auth" --> "auth/logout" : /logout <<path>>
+
+"coWorkingSpace" --> "coWorkingSpace/" : / <<path>>
+"coWorkingSpace" --> "coWorkingSpace/:id" : /{id} <<path>>
+"coWorkingSpace" --> "coWorkingSpace/:coworkingSpaceId/rooms" : /{coworkingSpaceId}/rooms <<path>>
+
+"coWorkingSpace/:coworkingSpaceId/rooms" --> "coWorkingSpace/:coworkingSpaceId/rooms/" : / <<path>>
+"coWorkingSpace/:coworkingSpaceId/rooms" --> "coWorkingSpace/:coworkingSpaceId/rooms/:id" : /{id} <<path>>
+
+"reservation" --> "reservation/" : / <<path>>
+"reservation" --> "reservation/me" : /me <<path>>
+"reservation" --> "reservation/:id" : /{id} <<path>>
+"reservation" --> "reservation/:id/share" : /{id}/share <<path>>
+"reservation" --> "reservation/:id/share/:userId" : /{id}/share/{userId} <<path>>
+"reservation" --> "reservation/:id/extend" : /{id}/extend <<path>>
+"reservation" --> "reservation/:id/approve-extension" : /{id}/approve-extension <<path>>
+"reservation" --> "reservation/initialize-reminders" : /initialize-reminders <<path>>
+
+"auth/login" ..> User : <<use>>
+"auth/register" ..> User : <<use>>
+"auth/me" ..> User : <<use>>
+"auth/logout" ..> User : <<use>>
+
+"coWorkingSpace/" ..> CoWorkingSpace : <<use>>
+"coWorkingSpace/:id" ..> CoWorkingSpace : <<use>>
+"coWorkingSpace/:coworkingSpaceId/rooms/" ..> Room : <<use>>
+"coWorkingSpace/:coworkingSpaceId/rooms/:id" ..> Room : <<use>>
+CoWorkingSpace ..> Room : "has many"
+Room ..> CoWorkingSpace : "belongs to"
+
+"reservation/" ..> Reservation : <<use>>
+"reservation/me" ..> Reservation : <<use>>
+"reservation/:id" ..> Reservation : <<use>>
+"Share" ..> Reservation : <<use>>
+"Share" ..> User : <<use>>
+"Extend" ..> Reservation : <<use>>
+"Notifications" ..> Reservation : <<use>>
+"Notifications" ..> User : <<use>>
+
+Reservation ..> User : "belongs to"
+Reservation ..> CoWorkingSpace : "belongs to"
+Reservation ..> Room : "belongs to"
+Reservation ..> User : "shared with"
+
+Room ..> Reservation : "has many"
+User ..> Reservation : "has many"
+
+@enduml

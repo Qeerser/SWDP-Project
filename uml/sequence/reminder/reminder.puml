@@ -1,0 +1,21 @@
+@startuml
+title Automatic Reservation Reminders
+
+participant "Scheduler" as Scheduler
+participant "AgendaService" as AgendaService
+participant "Reservation" as Reservation
+participant "NotificationService" as NotificationService
+actor "User" as User
+
+Scheduler ->> AgendaService : trigger scheduled job
+AgendaService ->> Reservation : find upcoming reservations
+Reservation ->> AgendaService : returns list of reservations
+loop for each reservation
+  AgendaService ->> Reservation : get reservation details (user, time)
+  Reservation ->> AgendaService : returns user and time
+  AgendaService ->> NotificationService : send reminder (user, reservation details)
+  NotificationService ->> User : sends email notification
+  AgendaService ->> Reservation : update reminderSent = true
+  Reservation ->> AgendaService : acknowledgement
+end
+@enduml

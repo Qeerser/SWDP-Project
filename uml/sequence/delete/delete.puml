@@ -1,0 +1,18 @@
+@startuml
+title Delete Reservation
+
+actor User
+participant "Controller" as ReservationController
+participant "Service" as ReservationService
+participant "Reservation" as Reservation
+participant "Database" as Database
+
+User -> ReservationController : DELETE /reservations/{id}
+ReservationController -> ReservationService : deleteReservation(id)
+ReservationService -> Reservation : findByIdAndDelete(id)
+Reservation -> Database : delete reservation with id
+Database -> Reservation : returns deleted reservation data
+Reservation -> ReservationService : returns deleted reservation data
+ReservationService -> ReservationController : returns 200 OK, deleted reservation
+ReservationController -> User : returns 200 OK, deleted reservation
+@enduml
