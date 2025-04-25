@@ -1,31 +1,30 @@
 import mongoose from "mongoose";
 
-
 const CoWorkingSpaceSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, 'Please add a co-working space name'],
+      required: [true, "Please add a co-working space name"],
     },
     address: {
       type: String,
-      required: [true, 'Please add an address'],
+      required: [true, "Please add an address"],
     },
     telephoneNumber: {
       type: String,
     },
     openTime: {
       type: String,
-      required: [true, 'Please add the opening time'],
+      required: [true, "Please add the opening time"],
     },
     closeTime: {
       type: String,
-      required: [true, 'Please add the closing time'],
+      required: [true, "Please add the closing time"],
     },
     rooms: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Room',
+        ref: "Room",
       },
     ],
     createdAt: {
@@ -40,4 +39,4 @@ const CoWorkingSpaceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model('CoWorkingSpace', CoWorkingSpaceSchema);
+export default mongoose.model("CoWorkingSpace", CoWorkingSpaceSchema);

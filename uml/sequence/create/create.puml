@@ -7,11 +7,12 @@ participant "Service" as ReservationService
 participant "Reservation" as Reservation
 participant "Database" as Database
 
-User ->> Controller : POST /reservations { reservationData }
-Controller ->> Service : createReservation(reservationData)
-Service ->> Reservation : new Reservation(reservationData)
+User ->> ReservationController : POST /reservations { reservationData }
+ReservationController ->> ReservationService : createReservation(reservationData)
+ReservationService ->> Reservation : new Reservation(reservationData)
 Reservation ->> Database : save()
 Database ->> Reservation : returns saved reservation
-Service ->> Controller : returns saved reservation
-Controller ->> User : returns 201 Created, reservation
+Reservation ->> ReservationService : returns reservation
+ReservationService ->> ReservationController : returns saved reservation
+ReservationController ->> User : returns 201 Created, reservation
 @enduml

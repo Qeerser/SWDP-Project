@@ -286,7 +286,6 @@ const scheduleReservationReminder = async (reservationId) => {
       return;
     }
 
-    // Calculate time for 1 hour before reservation
     const reminderTime = new Date(reservation.startTime);
     reminderTime.setHours(reminderTime.getHours() - 24);
 
