@@ -81,7 +81,7 @@ export const getUserReservations = asyncHandler(async (req, res, next) => {
 // @route   POST /api/v1/reservations
 // @access  Private (User)
 export const createReservation = asyncHandler(async (req, res, next) => {
-  req.body.user = req.user.id; // Assuming you have authentication middleware that sets req.user
+  req.body.user = req.user.id;
 
   // Check if the co-working space and room exist
   const coworkingSpace = await CoWorkingSpace.findById(req.body.coWorkingSpace);
@@ -97,6 +97,45 @@ export const createReservation = asyncHandler(async (req, res, next) => {
     return res.status(404).json({
       success: false,
       msg: `Room not found with id ${req.body.room}`,
+    });
+  }
+
+  const existedAppointment = await Reservation.find({ user: req.user.id });
+  if (existedAppointment.length >= 3 && req.user.role !== "admin") {
+    return res.status(400).json({
+      success: false,
+      msg: `The user with ID ${req.user.id} has already made 3 reservations`,
+    });
+  }
+
+  // Check time valid in open close of coworking and date is in future
+  if (new Date(req.body.startTime) < new Date()) {
+    return res.status(400).json({
+      success: false,
+      msg: "Reservation date must be in the future",
+    });
+  }
+  // Parse input times from the request
+  const startTime = new Date(req.body.startTime);
+  const endTime = new Date(req.body.endTime);
+
+  // Function to convert time string like '10:00' to total minutes
+  const timeStrToMinutes = (str) => {
+    const [h, m] = str.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  // Function to extract total minutes from Date object (local time)
+  const getMinutes = (date) => date.getHours() * 60 + date.getMinutes();
+
+  // Compare time in minutes
+  if (
+    getMinutes(startTime) < timeStrToMinutes(coworkingSpace.openTime) ||
+    getMinutes(endTime) > timeStrToMinutes(coworkingSpace.closeTime)
+  ) {
+    return res.status(400).json({
+      success: false,
+      msg: "Reservation time is outside of co-working space hours",
     });
   }
 
@@ -156,6 +195,19 @@ export const updateReservation = asyncHandler(async (req, res, next) => {
     return res.status(401).json({
       success: false,
       msg: `User not authorized to update this reservation`,
+    });
+  }
+
+  // Cannot edit if less than 1 day before the reservation start time
+  const now = new Date();
+  const startTime = new Date(reservation.startTime);
+  const diffInMs = startTime - now;
+  const diffInHours = diffInMs / (1000 * 60 * 60);
+
+  if (diffInHours < 24 && req.user.role !== "admin") {
+    return res.status(400).json({
+      success: false,
+      msg: "Cannot edit reservation less than 1 day before the start time",
     });
   }
 
@@ -236,7 +288,7 @@ const scheduleReservationReminder = async (reservationId) => {
 
     // Calculate time for 1 hour before reservation
     const reminderTime = new Date(reservation.startTime);
-    reminderTime.setHours(reminderTime.getHours() - 1);
+    reminderTime.setHours(reminderTime.getHours() - 24);
 
     // Schedule the reminder job with Agenda
     await agenda.schedule(reminderTime, "send reservation reminder", {
