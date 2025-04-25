@@ -92,8 +92,6 @@ export const createReservation = asyncHandler(async (req, res, next) => {
     });
   }
 
-  console.log(coworkingSpace)
-
   const room = await Room.findById(req.body.room);
   if (!room) {
     return res.status(404).json({
@@ -199,6 +197,19 @@ export const updateReservation = asyncHandler(async (req, res, next) => {
     });
   }
 
+  // Cannot edit if less than 1 day before the reservation start time
+  const now = new Date();
+  const startTime = new Date(reservation.startTime);
+  const diffInMs = startTime - now;
+  const diffInHours = diffInMs / (1000 * 60 * 60);
+
+  if (diffInHours < 24 && req.user.role !== "admin") {
+    return res.status(400).json({
+      success: false,
+      msg: "Cannot edit reservation less than 1 day before the start time",
+    });
+  }
+
   // If the start time is being updated, reschedule the reminder
   const startTimeChanged =
     req.body.startTime &&
@@ -276,7 +287,7 @@ const scheduleReservationReminder = async (reservationId) => {
 
     // Calculate time for 1 hour before reservation
     const reminderTime = new Date(reservation.startTime);
-    reminderTime.setHours(reminderTime.getHours() - 1);
+    reminderTime.setHours(reminderTime.getHours() - 24);
 
     // Schedule the reminder job with Agenda
     await agenda.schedule(reminderTime, "send reservation reminder", {

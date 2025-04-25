@@ -6,7 +6,7 @@ import { sendEmail } from "./utils/emailConfig.js"; // Adjust path if needed
 (async () => {
   try {
     await sendEmail({
-      email: "kknot2004@gmail.com",
+      email: "p.pothebungkarn@gmail.com",
       subject: "🔔 Test Reminder",
       message: "This is a test reminder email.",
       html: "<p>This is a <b>test</b> reminder email.</p>",
