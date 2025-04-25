@@ -1,0 +1,18 @@
+@startuml
+title Read All Reservations
+
+actor Admin
+participant "Controller" as ReservationController
+participant "Service" as ReservationService
+participant "Reservation" as Reservation
+participant "Database" as Database
+
+Admin -> ReservationController : GET /reservations
+ReservationController -> ReservationService : getReservations()
+ReservationService -> Reservation : find()
+Reservation -> Database : query for all reservations
+Database -> Reservation : returns list of reservations
+Reservation -> ReservationService : returns list of reservations
+ReservationService -> ReservationController : returns list of reservations
+ReservationController -> Admin : returns 200 OK, reservations
+@enduml

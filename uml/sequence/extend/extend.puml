@@ -1,0 +1,27 @@
+@startuml
+title Extend Reservation
+
+actor "User" as User
+participant "Controller" as ReservationController
+participant "ReservationService" as ReservationService
+participant "Reservation" as Reservation
+participant "CoWorkingSpaceService" as CoWorkingSpaceService
+participant "Room" as Room
+
+User->>ReservationController: POST /reservations/:id/extend { newEndTime }
+ReservationController->>ReservationService: requestExtension(reservationId, newEndTime)
+ReservationService->>Reservation: findById(reservationId)
+Reservation-->>ReservationService: returns reservation
+ReservationService->>CoWorkingSpaceService: checkRoomAvailability(reservation.roomId, reservation.date, reservation.endTime, newEndTime)
+CoWorkingSpaceService->>Room: query for overlapping reservations
+Room-->>CoWorkingSpaceService: returns availability status
+alt space is available
+    ReservationService->>Reservation: update extensionRequested = true, requestedEndTime = newEndTime
+    Reservation-->>ReservationService: acknowledgement
+    ReservationService-->>ReservationController: returns "Extension Requested"
+else space is not available
+    ReservationService->>ReservationController: returns "Space not available for extension"
+end
+ReservationController-->>User: returns response
+
+@enduml

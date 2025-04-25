@@ -1,0 +1,17 @@
+@startuml
+title Create Reservation
+
+actor User
+participant "Controller" as ReservationController
+participant "Service" as ReservationService
+participant "Reservation" as Reservation
+participant "Database" as Database
+
+User ->> Controller : POST /reservations { reservationData }
+Controller ->> Service : createReservation(reservationData)
+Service ->> Reservation : new Reservation(reservationData)
+Reservation ->> Database : save()
+Database ->> Reservation : returns saved reservation
+Service ->> Controller : returns saved reservation
+Controller ->> User : returns 201 Created, reservation
+@enduml

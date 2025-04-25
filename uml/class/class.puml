@@ -1,0 +1,73 @@
+@startuml
+
+class User <<Resource>> {
+    - _id: ObjectId
+    - name: string
+    - email: string <<unique>>
+    - role: string <<enum: user|admin>> = "user"
+    - password: string <<minlength: 6, select: false>>
+    - telephone: string <<unique>>
+    - resetPasswordToken: string
+    - resetPasswordExpire: Date
+    - createdAt: Date
+    + getSignedJwtToken(): string
+    + matchPassword(string): boolean
+}
+
+class Admin <<Resource>> {
+    + viewAllReservations()
+    + editAnyReservation()
+    + deleteAnyReservation()
+}
+
+class CoWorkingSpace <<Resource>> {
+    - _id: ObjectId
+    - name: string
+    - address: string
+    - telephoneNumber: string
+    - openTime: string
+    - closeTime: string
+    - rooms: ObjectId[] <<ref: Room>>
+    - createdAt: Date
+    - updatedAt: Date
+}
+
+class Room <<Resource>> {
+    - _id: ObjectId
+    - name: string
+    - capacity: Number
+    - amenities: string[]
+    - coWorkingSpace: ObjectId <<ref: CoWorkingSpace>>
+    - reservations: ObjectId[] <<ref: Reservation>>
+    - createdAt: Date
+    - updatedAt: Date
+}
+
+class Reservation <<Resource>> {
+    - _id: ObjectId
+    - user: ObjectId <<ref: User, required>>
+    - coWorkingSpace: ObjectId <<ref: CoWorkingSpace, required>>
+    - room: ObjectId <<ref: Room, required>>
+    - date: Date <<required>>
+    - startTime: Date <<required>>
+    - endTime: Date <<required>>
+    - sharedWith: ObjectId[] <<ref: User>>
+    - createdAt: Date
+    - updatedAt: Date
+    - reminderSent: Boolean = false
+    - extensionRequested: Boolean = false
+    + viewReservation()
+    + editReservation()
+    + deleteReservation()
+    + shareReservation()
+    + extendReservation()
+}
+
+User "1" -- "0..*" Reservation : makes
+CoWorkingSpace "1" -- "1..*" Room : has
+Room "1..*" -- "0..*" Reservation : is included in
+Admin --|> User
+Admin "1..*" -- "0..*" Reservation : manages
+Admin "1..*" -- "0..*" Room : manages
+Admin "1..*" -- "0..*" CoWorkingSpace : manages
+@enduml

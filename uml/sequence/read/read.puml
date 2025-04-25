@@ -1,0 +1,18 @@
+@startuml
+title Read Single Reservation
+
+actor User
+participant "Controller" as ReservationController
+participant "Service" as ReservationService
+participant "Reservation" as Reservation
+participant "Database" as Database
+
+User ->> ReservationController : GET /reservations/{id}
+ReservationController ->> ReservationService : getReservation(id)
+ReservationService ->> Reservation : findById(id)
+Reservation ->> Database : query for reservation with id
+Database ->> Reservation : returns reservation data
+Reservation ->> ReservationService : returns reservation data
+ReservationService ->> ReservationController : returns reservation data
+ReservationController ->> User : returns 200 OK, reservation
+@enduml

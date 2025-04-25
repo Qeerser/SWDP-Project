@@ -1,0 +1,18 @@
+@startuml
+title Update Reservation
+
+actor User
+participant "Controller" as ReservationController
+participant "Service" as ReservationService
+participant "Reservation" as Reservation
+participant "Database" as Database
+
+User ->> ReservationController : PUT /reservations/{id} { updatedData }
+ReservationController ->> ReservationService : updateReservation(id, updatedData)
+ReservationService ->> Reservation : findByIdAndUpdate(id, updatedData, { new: true })
+Reservation ->> Database : update reservation with id
+Database ->> Reservation : returns updated reservation data
+Reservation ->> ReservationService : returns updated reservation data
+ReservationService ->> ReservationController : returns updated reservation data
+ReservationController ->> User : returns 200 OK, updated reservation
+@enduml
