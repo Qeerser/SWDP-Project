@@ -7,14 +7,14 @@ import asyncHandler from '../middleware/async.js';
 const register = asyncHandler(async (req, res) => {
 	try {
 		const { name, email, password, role, telephone } = req.body;
-
+		console.log(telephone.replace(/\D/g, ''));
 		// Create user
 		const user = await User.create({
 			name,
 			email,
 			password,
 			role,
-			telephone,
+			telephone: telephone.replace(/\D/g, ''),
 		});
 
 		// Create token
