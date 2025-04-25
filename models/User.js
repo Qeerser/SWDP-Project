@@ -30,6 +30,10 @@ const UserSchema = new mongoose.Schema({
 	telephone: {
 		type: String,
 		required: [true, "Please add a telephone number"],
+		match: [
+			/^\d{10}$/,
+			"Please add a valid telephone number",
+		],
 		unique: true,
 	},
 	resetPasswordToken: String,
