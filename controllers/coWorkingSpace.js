@@ -5,7 +5,7 @@ import asyncHandler from '../middleware/async.js';
 // @route   GET /api/v1/coworking-spaces
 // @access  Public
 export const getCoWorkingSpaces = asyncHandler(async (req, res, next) => {
-  const coworkingSpaces = await CoWorkingSpace.find();
+  const coworkingSpaces = await CoWorkingSpace.find().populate('rooms'); // Populate rooms if needed
   res.status(200).json({ success: true, count: coworkingSpaces.length, data: coworkingSpaces });
 });
 
